@@ -1,0 +1,194 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ---------------------------------------------------------------------------
+// Enums
+// ---------------------------------------------------------------------------
+
+enum Role {
+  COMPANY
+  CREATOR
+  ADMIN
+}
+
+enum BriefStatus {
+  DRAFT
+  PUBLISHED
+  IN_PROGRESS
+  DELIVERED
+  COMPLETED
+}
+
+enum ApplicationStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+  WITHDRAWN
+}
+
+enum DeliverableStatus {
+  SUBMITTED
+  REVISION_REQUESTED
+  APPROVED
+}
+
+enum PaymentStatus {
+  PENDING
+  HELD
+  RELEASED
+  REFUNDED
+  FAILED
+}
+
+// ---------------------------------------------------------------------------
+// Core identity
+// ---------------------------------------------------------------------------
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String
+  role      Role
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  company        Company?
+  creatorProfile CreatorProfile?
+  messages       Message[]
+
+  @@map("users")
+}
+
+model Company {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name      String
+  sector    String
+  createdAt DateTime @default(now())
+
+  briefs Brief[]
+
+  @@map("companies")
+}
+
+model CreatorProfile {
+  id            String   @id @default(cuid())
+  userId        String   @unique
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  bio           String?
+  sectors       String[]
+  portfolioUrls String[]
+  ratingAvg     Float    @default(0)
+  reviewCount   Int      @default(0)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  applications Application[]
+  deliverables Deliverable[]
+  reviews      Review[]
+
+  @@map("creator_profiles")
+}
+
+// ---------------------------------------------------------------------------
+// Brief lifecycle
+// ---------------------------------------------------------------------------
+
+model Brief {
+  id          String      @id @default(cuid())
+  companyId   String
+  company     Company     @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  title          String
+  sector         String
+  format         String
+  budget         Int
+  description    String?
+  deadline       DateTime?
+  creatorsNeeded Int?
+  status         BriefStatus @default(DRAFT)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  applications Application[]
+  deliverables Deliverable[]
+  messages     Message[]
+  payment      Payment?
+  review       Review?
+
+  @@map("briefs")
+}
+
+model Application {
+  id        String            @id @default(cuid())
+  briefId   String
+  brief     Brief             @relation(fields: [briefId], references: [id], onDelete: Cascade)
+  creatorId String
+  creator   CreatorProfile    @relation(fields: [creatorId], references: [id], onDelete: Cascade)
+  status    ApplicationStatus @default(PENDING)
+  message   String?
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+
+  @@unique([briefId, creatorId])
+  @@map("applications")
+}
+
+model Deliverable {
+  id        String            @id @default(cuid())
+  briefId   String
+  brief     Brief             @relation(fields: [briefId], references: [id], onDelete: Cascade)
+  creatorId String
+  creator   CreatorProfile    @relation(fields: [creatorId], references: [id], onDelete: Cascade)
+  fileUrl   String
+  fileName  String            @default("")
+  sizeBytes Int               @default(0)
+  version   Int               @default(1)
+  status    DeliverableStatus @default(SUBMITTED)
+  createdAt DateTime          @default(now())
+
+  @@map("deliverables")
+}
+
+model Payment {
+  id         String        @id @default(cuid())
+  briefId    String        @unique
+  brief      Brief         @relation(fields: [briefId], references: [id], onDelete: Cascade)
+  amount     Int
+  commission Int
+  status     PaymentStatus @default(PENDING)
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
+
+  @@map("payments")
+}
+
+model Review {
+  id        String         @id @default(cuid())
+  briefId   String         @unique
+  brief     Brief          @relation(fields: [briefId], references: [id], onDelete: Cascade)
+  creatorId String
+  creator   CreatorProfile @relation(fields: [creatorId], references: [id], onDelete: Cascade)
+  rating    Int
+  comment   String?
+  createdAt DateTime       @default(now())
+
+  @@map("reviews")
+}
+
+model Message {
+  id        String   @id @default(cuid())
+  briefId   String
+  brief     Brief    @relation(fields: [briefId], references: [id], onDelete: Cascade)
+  senderId  String
+  sender    User     @relation(fields: [senderId], references: [id], onDelete: Cascade)
+  body      String
+  createdAt DateTime @default(now())
+
+  @@map("messages")
+}
